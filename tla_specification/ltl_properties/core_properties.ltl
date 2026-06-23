@@ -1,0 +1,174 @@
+================================================================================
+                         ALALAWI DETERMINISTIC SOVEREIGN CORE
+                                  (ADSC-HCSP)
+================================================================================
+
+1. SYSTEM STATE DEFINITION
+================================================================================
+
+State = (R, N) where:
+   R ∈ ℤ  (the computed result)
+   N ∈ ℤ  (the input parameter i)
+
+Valid Input Condition:
+   ValidState(s) = (0 ≤ s.R ≤ 20000000) ∧ (0 ≤ s.N < 1000)
+
+================================================================================
+2. TRANSITION SYSTEM
+================================================================================
+
+For any input value i, the transition function T : State × ℤ → State is:
+
+   T(s, i) = ( (s.R * 105) / (100 + i*2), i )
+
+This defines the next state in the temporal evolution of the system.
+
+================================================================================
+3. TEMPORAL PROPERTIES (LTL Formulae)
+================================================================================
+
+Let ◻ denote "always" (global) and ◇ denote "eventually" (future).
+
+================================================================================
+3.1 SAFETY PROPERTY (Always True)
+================================================================================
+
+Property P1: The system never computes a negative R.
+
+   ◻ ( ValidState(s)  →  T(s, i).R ≥ 0 )
+
+This is the exact LTL translation of:
+   - C: \result.R >= 0
+   - Coq: (transition_function current i).(R) >= 0
+   - TLA+: Transition(current, i).R >= 0
+
+================================================================================
+3.2 LIVENESS PROPERTY (Always Valid Range)
+================================================================================
+
+Property P2: The liveness check always returns 0 or 1.
+
+   ◻ ( LivenessCheck(s) ∈ {0, 1} )
+
+Where:
+   LivenessCheck(s) = 1 if s.R > 0, and 0 otherwise.
+
+This matches:
+   - C: \result == 0 || \result == 1
+   - TLA+: LivenessRange(s)
+
+================================================================================
+3.3 DETERMINISM PROPERTY (Unique Next State)
+================================================================================
+
+Property P3: Every state has exactly one possible successor.
+
+   ◻ ( ∀i₁, i₂ : i₁ = i₂  →  T(s, i₁) = T(s, i₂) )
+
+This ensures the system is fully deterministic.
+
+================================================================================
+3.4 PROGRESS PROPERTY (Never Blocks)
+================================================================================
+
+Property P4: The system can always take a step (no deadlocks).
+
+   ◻ ( ∃ next_state : Transition(current, i) = next_state )
+
+Since the transition function is total, this is always true.
+
+================================================================================
+4. FORMAL LTL PROOF THEOREMS
+================================================================================
+
+================================================================================
+THEOREM 1: SAFETY (Corresponds to Coq: transition_safety)
+================================================================================
+
+   ⊨  ◻ ( ValidState(s) → T(s, i).R ≥ 0 )
+
+Proof Steps:
+   1. Assumption: ValidState(s) holds.
+   2. From ValidState(s): s.R ≥ 0, s.R ≤ 20000000, and 0 ≤ i < 1000.
+   3. numerator = s.R * 105 ≥ 0.
+   4. denominator = 100 + i*2 ≥ 100 > 0.
+   5. Since numerator ≥ 0 and denominator > 0, numerator/denominator ≥ 0.
+   6. Therefore, T(s, i).R = numerator/denominator ≥ 0.
+   7. Since the condition holds for all states, it holds always: ◻ P1.
+
+QED.
+
+================================================================================
+THEOREM 2: LIVENESS RANGE (Corresponds to Frama-C ensures)
+================================================================================
+
+   ⊨  ◻ ( LivenessCheck(s) ∈ {0, 1} )
+
+Proof Steps:
+   1. LivenessCheck(s) is defined as (s.R > 0) ? 1 : 0.
+   2. The conditional operator always returns either 1 or 0.
+   3. Therefore, LivenessCheck(s) ∈ {0, 1} holds for every state.
+   4. Since it holds for all states, it holds always: ◻ P2.
+
+QED.
+
+================================================================================
+THEOREM 3: DETERMINISM (Unique Successor)
+================================================================================
+
+   ⊨  ◻ ( ∀i₁, ∀i₂ : i₁ = i₂ → T(s, i₁) = T(s, i₂) )
+
+Proof Steps:
+   1. For any state s and any two equal inputs i₁ = i₂:
+   2. T(s, i₁) = ( (s.R*105)/(100+i₁*2), i₁ )
+   3. T(s, i₂) = ( (s.R*105)/(100+i₂*2), i₂ )
+   4. Since i₁ = i₂, both components are equal.
+   5. Therefore, T(s, i₁) = T(s, i₂).
+   6. Hence, the transition is deterministic.
+
+QED.
+
+================================================================================
+THEOREM 4: PROGRESS (No Deadlocks)
+================================================================================
+
+   ⊨  ◻ ( ∃ next : next = T(s, i) )
+
+Proof Steps:
+   1. T is a total function from State × ℤ to State.
+   2. For any state s and any input i, T(s, i) is well-defined.
+   3. Therefore, there always exists a next state.
+   4. Hence, the system never deadlocks.
+
+QED.
+
+================================================================================
+5. SUMMARY OF LTL PROPERTIES
+================================================================================
+
+| Property ID | LTL Formula | Matches |
+|-------------|-------------|---------|
+| **P1** (Safety)    | ◻ ( ValidState(s) → T(s, i).R ≥ 0 ) | Coq, Frama-C, TLA+ |
+| **P2** (Liveness)  | ◻ ( LivenessCheck(s) ∈ {0, 1} ) | Frama-C ensures |
+| **P3** (Determinism) | ◻ ( i₁ = i₂ → T(s, i₁) = T(s, i₂) ) | C, Coq, TLA+ |
+| **P4** (Progress)  | ◻ ( ∃ next : next = T(s, i) ) | TLA+: NoDeadlock |
+
+================================================================================
+6. COMPLETE SYSTEM SPECIFICATION (LTL)
+================================================================================
+
+The complete system satisfies:
+
+   ◻ ( ValidState(s) → T(s, i).R ≥ 0 )
+   ∧
+   ◻ ( LivenessCheck(s) ∈ {0, 1} )
+   ∧
+   ◻ ( i₁ = i₂ → T(s, i₁) = T(s, i₂) )
+   ∧
+   ◻ ( ∃ next : next = T(s, i) )
+
+All four properties hold for all reachable states and all time steps.
+
+================================================================================
+END OF LTL PROOF
+================================================================================
